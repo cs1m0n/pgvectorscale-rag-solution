@@ -2,17 +2,43 @@ from datetime import datetime
 
 import pandas as pd
 from database.vector_store import VectorStore
-from datasets import load_dataset
 from timescale_vector.client import uuid_from_time
+
+import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="./.env")
 
 # Initialize VectorStore
 vec = VectorStore()
 
-# Load the dataset
-dataset = load_dataset("cnn_dailymail", "3.0.0")
-subset = dataset["train"].shuffle(seed=42).select(range(1000))
-df = pd.DataFrame(subset)
+# API endpoint you want to call
+url = "https://literatureapi.bcc.no/api/Article/publication/1/2024/12?lang=no"
 
+# Your Bearer token
+bearer_token = os.getenv("LITERATURE_TOKEN")
+
+# Headers including the Authorization header
+headers = {
+    "Authorization": f"Bearer {bearer_token}",
+    "Accept": "application/json"
+}
+
+# Make the GET request
+response = requests.get(url, headers=headers)
+
+# Check the response
+if response.status_code == 200:
+    print("Success!")
+    chapters = response.json()
+
+else:
+    print(f"Request failed with status code {response.status_code}")
+    print(response.text)
+
+# Load the dataset
+df = pd.DataFrame(chapters)
 
 # Prepare data for insertion
 def prepare_record(row):
@@ -28,19 +54,22 @@ def prepare_record(row):
         This function uses the current time for the UUID. To use a specific time,
         create a datetime object and use uuid_from_time(your_datetime).
     """
-    content = row["article"]
+
+    content = row['content']
     embedding = vec.get_embedding(content)
     return pd.Series(
         {
             "id": str(uuid_from_time(datetime.now())),
             "metadata": {
+                "uid": row["id"],
                 "created_at": datetime.now().isoformat(),
+                "source": "literature",
+                "lang": "no"
             },
             "contents": content,
             "embedding": embedding,
         }
     )
-
 
 records_df = df.apply(prepare_record, axis=1)
 

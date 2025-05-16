@@ -48,7 +48,7 @@ class DatabaseSettings(BaseModel):
 class VectorStoreSettings(BaseModel):
     """Settings for the VectorStore."""
 
-    table_name: str = "documents"
+    table_name: str = "entries"
     embedding_dimensions: int = 1536
     time_partition_interval: timedelta = timedelta(days=7)
 
@@ -60,7 +60,6 @@ class Settings(BaseModel):
     cohere: CohereSettings = Field(default_factory=CohereSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     vector_store: VectorStoreSettings = Field(default_factory=VectorStoreSettings)
-
 
 @lru_cache()
 def get_settings() -> Settings:

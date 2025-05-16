@@ -50,23 +50,23 @@ Keyword search in PostgreSQL leverages full-text search capabilities to find rel
 
 The `keyword_search` method in `vector_store.py` performs the following steps:
 
-1. Converts the contents of each document into a tsvector (text search vector) using `to_tsvector('english', contents)`.
-2. Transforms the user's query into a tsquery (text search query) using `websearch_to_tsquery('english', %s)`.
+1. Converts the contents of each document into a tsvector (text search vector) using `to_tsvector('norwegian', contents)`.
+2. Transforms the user's query into a tsquery (text search query) using `websearch_to_tsquery('norwegian', %s)`.
 3. Matches the query against the document vectors using the `@@` operator.
 4. Ranks the results using `ts_rank_cd` for relevance scoring.
 
 Here's a breakdown of the SQL query used:
 
 ```sql
-SELECT id, contents, ts_rank_cd(to_tsvector('english', contents), query) as rank
-FROM {self.vector_settings.table_name}, websearch_to_tsquery('english', %s) query
-WHERE to_tsvector('english', contents) @@ query
+SELECT id, contents, ts_rank_cd(to_tsvector('norwegian', contents), query) as rank
+FROM {self.vector_settings.table_name}, websearch_to_tsquery('norwegian', %s) query
+WHERE to_tsvector('norwegian', contents) @@ query
 ORDER BY rank DESC
 LIMIT %s
 ```
 
-- `to_tsvector('english', contents)`: Converts the document content into a searchable vector of lexemes.
-- `websearch_to_tsquery('english', %s)`: Parses the user's query into a tsquery, supporting web search syntax.
+- `to_tsvector('norwegian', contents)`: Converts the document content into a searchable vector of lexemes.
+- `websearch_to_tsquery('norwegian', %s)`: Parses the user's query into a tsquery, supporting web search syntax.
 - `@@`: The match operator, returns true if the tsvector matches the tsquery.
 - `ts_rank_cd`: Calculates the relevance score based on the frequency and proximity of matching terms.
 
@@ -86,7 +86,7 @@ The GIN (Generalized Inverted Index) index is implemented in the VectorStore cla
 
 ```SQL
 CREATE INDEX IF NOT EXISTS index_name
-ON table_name USING gin(to_tsvector('english', contents));
+ON table_name USING gin(to_tsvector('norwegian', contents));
 ```
 
 ### What About BM25 Ranking?

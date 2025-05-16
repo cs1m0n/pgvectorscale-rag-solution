@@ -6,3 +6,5 @@ timescale-vector
 instructor
 anthropic
 cohere
+fastapi
+uvicorn

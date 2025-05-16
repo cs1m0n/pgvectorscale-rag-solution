@@ -33,7 +33,7 @@ class VectorStore:
         index_name = f"idx_{self.vector_settings.table_name}_contents_gin"
         create_index_sql = f"""
         CREATE INDEX IF NOT EXISTS {index_name}
-        ON {self.vector_settings.table_name} USING gin(to_tsvector('english', contents));
+        ON {self.vector_settings.table_name} USING gin(to_tsvector('norwegian', contents));
         """
         try:
             with psycopg.connect(self.settings.database.service_url) as conn:
@@ -74,7 +74,10 @@ class VectorStore:
 
     def create_index(self) -> None:
         """Create the StreamingDiskANN index to spseed up similarity search"""
-        self.vec_client.create_embedding_index(client.DiskAnnIndex())
+        try:
+            self.vec_client.create_embedding_index(client.DiskAnnIndex())
+        except Exception as e:
+            logging.error(f"Skip creating the StreamingDiskANN index: {str(e)}")
 
     def drop_index(self) -> None:
         """Drop the StreamingDiskANN index in the database"""
@@ -271,9 +274,9 @@ class VectorStore:
             results = vector_store.keyword_search("shipping options")
         """
         search_sql = f"""
-        SELECT id, contents, ts_rank_cd(to_tsvector('english', contents), query) as rank
-        FROM {self.vector_settings.table_name}, websearch_to_tsquery('english', %s) query
-        WHERE to_tsvector('english', contents) @@ query
+        SELECT id, contents, ts_rank_cd(to_tsvector('simple', contents), query) as rank
+        FROM {self.vector_settings.table_name}, websearch_to_tsquery('simple', %s) query
+        WHERE to_tsvector('simple', contents) @@ query
         ORDER BY rank DESC
         LIMIT %s
         """
@@ -290,7 +293,7 @@ class VectorStore:
         self._log_search_time("Keyword", elapsed_time)
 
         if return_dataframe:
-            df = pd.DataFrame(results, columns=["id", "content", "rank"])
+            df = pd.DataFrame(results, columns=["id", "content", "distance"])
             df["id"] = df["id"].astype(str)
             return df
         else:
@@ -326,14 +329,14 @@ class VectorStore:
             query, limit=keyword_k, return_dataframe=True
         )
         keyword_results["search_type"] = "keyword"
-        keyword_results = keyword_results[["id", "content", "search_type"]]
+        keyword_results = keyword_results[["id", "content", "distance", "search_type"]]
 
         # Perform semantic search
         semantic_results = self.semantic_search(
             query, limit=semantic_k, return_dataframe=True
         )
         semantic_results["search_type"] = "semantic"
-        semantic_results = semantic_results[["id", "content", "search_type"]]
+        semantic_results = semantic_results[["id", "content", "distance", "search_type"]]
 
         # Combine results
         combined_results = pd.concat(
@@ -343,8 +346,8 @@ class VectorStore:
         # Remove duplicates, keeping the first occurrence (which maintains the original order)
         combined_results = combined_results.drop_duplicates(subset=["id"], keep="first")
 
-        if rerank:
-            return self._rerank_results(query, combined_results, top_n)
+        # if rerank:
+        #     return self._rerank_results(query, combined_results, top_n)
 
         return combined_results
 
@@ -363,7 +366,7 @@ class VectorStore:
             A pandas DataFrame containing the reranked results.
         """
         rerank_results = self.cohere_client.v2.rerank(
-            model="rerank-english-v3.0",
+            model="rerank-v3.5",
             query=query,
             documents=combined_results["content"].tolist(),
             top_n=top_n,
